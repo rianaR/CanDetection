@@ -7,7 +7,7 @@ using namespace std;
 
 int main(int argc, char *argv[])
 {
-    Mat img = imread("images/cans/pepsi.jpg", CV_LOAD_IMAGE_COLOR);
+    Mat img = imread("images/cans/sevenup.jpg", CV_LOAD_IMAGE_COLOR);
     if(img.empty())
        return -1;
 
