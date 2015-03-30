@@ -69,6 +69,7 @@ int main(int argc, char *argv[])
 {
 
     Mat img = imread("images/cans/sevenup.jpg", CV_LOAD_IMAGE_COLOR);
+
     if(img.empty())
        return -1;
 
@@ -104,18 +105,46 @@ int main(int argc, char *argv[])
         line( cdst, Point(rightSide[0], rightSide[1]), Point(rightSide[2], rightSide[3]), Scalar(0,255,0), 3, CV_AA);
     }
 
+
+
     int dist = rightSide[0]-leftSide[0];
     int _hauteur = max(rightSide[3]-rightSide[1],leftSide[3]-leftSide[1]);
     int _marge_basse = _hauteur/4;
     Point h_g(leftSide[0],max(leftSide[1]-dist,0));
-    Point b_d(rightSide[0],rightSide[1]+_marge_basse);
+    Point b_d(rightSide[0],rightSide[3]+_marge_basse);
+    cout << h_g << endl;
+    cout << b_d << endl;
+    Mat threshold_output;
+      vector<vector<Point> > contours;
+      vector<Vec4i> hierarchy;
 
+      /// Detect edges using Threshold
+      threshold( dst, threshold_output, thresh, 255, THRESH_BINARY );
+      /// Find contours
+      findContours( Mat(threshold_output, Rect(h_g,b_d)), contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+
+
+      /// Find the rotated rectangles and ellipses for each contour
+      vector<RotatedRect> minRect( contours.size() );
+      //vector<RotatedRect> minEllipse( contours.size() );
+      RotatedRect minEllipse;
+    for (int i=0; i<contours.size() ;i++) {
+        if (contours[i].size() > 5) {
+            cout << "coucou" << endl;
+            minEllipse = fitEllipse(Mat(contours[i]));
+            break;
+        }
+    }
+
+    /*
     Mat matrice_Reduite(dst,Rect(h_g,b_d));
+    vector<Point2f> points;
 
-    RotatedRect mon_ellipse = fitEllipse(matrice_Reduite);
-
-    ellipse( img,mon_ellipse, Scalar(0,255,0), 3, CV_AA );
-
+    matrice_Reduite.copyTo(points);
+    RotatedRect mon_ellipse = fitEllipse(Mat(points));
+    */
+    ellipse( img,minEllipse, Scalar(0,255,0), 3, CV_AA );
+    rectangle(img,Rect(h_g,b_d),Scalar(255,100,0),3,CV_AA);
     //namedWindow("Detected lines",CV_WINDOW_AUTOSIZE);
     //imshow("Detected lines",cdst);
 
