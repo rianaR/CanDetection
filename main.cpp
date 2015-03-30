@@ -5,115 +5,88 @@
 using namespace cv;
 using namespace std;
 
+
+Mat src; Mat src_gray;
+int thresh = 100;
+int max_thresh = 255;
+RNG rng(12345);
+Point h_g,b_d;
+Mat dst;
+
+// Image
+void thresh_callback(int, void*);
+
+
+
+void thresh_callback(int, void*)
+{
+
+  Mat threshold_output;
+  vector<vector<Point> > contours;
+  vector<Vec4i> hierarchy;
+
+  /// Detect edges using Threshold
+  threshold( src_gray, threshold_output, thresh, 255, THRESH_BINARY );
+  /// Find contours
+  findContours( threshold_output, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
+
+
+  /// Find the rotated rectangles and ellipses for each contour
+  vector<RotatedRect> minRect( contours.size() );
+  vector<RotatedRect> minEllipse( contours.size() );
+
+
+  for( int i = 0; i < contours.size(); i++ )
+     { minRect[i] = minAreaRect( Mat(contours[i]) );
+       if( contours[i].size() > 5 )
+         { minEllipse[i] = fitEllipse( Mat(contours[i]) ); }
+     }
+
+  /// Draw contours + rotated rects + ellipses
+  Mat drawing = Mat::zeros( threshold_output.size(), CV_8UC3 );
+  for( int i = 0; i< contours.size(); i++ )
+     {
+       Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
+       // contour
+       drawContours( drawing, contours, i, color, 1, 8, vector<Vec4i>(), 0, Point() );
+       // ellipse
+        ellipse( drawing, minEllipse[i], color, 2, 8 );
+       // rotated rectangle
+       Point2f rect_points[4]; minRect[i].points( rect_points );
+       /*
+       for( int j = 0; j < 4; j++ )
+          line( drawing, rect_points[j], rect_points[(j+1)%4], color, 1, 8 );
+          */
+     }
+
+  /// Show in a window
+  namedWindow( "Contours", CV_WINDOW_AUTOSIZE );
+  imshow( "Contours", drawing );
+}
+
+
 int main(int argc, char *argv[])
 {
+
     Mat img = imread("images/cans/sevenup.jpg", CV_LOAD_IMAGE_COLOR);
     if(img.empty())
        return -1;
 
 
 
-    /*
-    Mat gray;
-
-    int scale = 1;
-    int delta = 0;
-    int ddepth = CV_16S;
-
-    cvtColor(img,gray,CV_BGR2GRAY);
-    Mat grad;
-
-    /// Contours horizontaux et verticaux avec filtres créés à la main
-    /*Mat contoursHor,contoursVer;
-
-    Mat filtreHor = (Mat_<double>(3,3) << 1,0,-1,2,0,-2,1,0,-1);
-    Mat filtreVer = (Mat_<double>(3,3) << 1,2,1,0,0,0,-1,-2,-1);
-    filter2D(gray,contoursHor,gray.depth(),filtreHor, Point(-1,-1));
-    filter2D(gray,contoursVer,gray.depth(),filtreVer,Point(-1,-1));
-    pow(contoursHor,2,contoursHor);
-    pow(contoursVer,2,contoursVer);
-
-    namedWindow("Contours horizontaux");
-    imshow("Contours horizontaux",contoursHor);
-    namedWindow("Contours verticaux");
-    imshow("Contours verticaux",contoursVer);
-
-    ///Utilisation du filtre de Sobel fait par OpenCV
-    Mat grad_x, grad_y;
-      Mat abs_grad_x, abs_grad_y;
-
-      /// Gradient X
-      //Scharr( src_gray, grad_x, ddepth, 1, 0, scale, delta, BORDER_DEFAULT );
-      Sobel( gray, grad_x, ddepth, 1, 0, 3, scale, delta, BORDER_DEFAULT );
-      convertScaleAbs( grad_x, abs_grad_x );
-
-      /// Gradient Y
-      //Scharr( src_gray, grad_y, ddepth, 0, 1, scale, delta, BORDER_DEFAULT );
-      Sobel( gray, grad_y, ddepth, 0, 1, 3, scale, delta, BORDER_DEFAULT );
-      convertScaleAbs( grad_y, abs_grad_y );
-
-      /// Total Gradient (approximate)
-      addWeighted( abs_grad_x, 0.5, abs_grad_y, 0.5, 0, grad );
-
-
-    Mat cdst;
-    cvtColor(grad, cdst, CV_GRAY2BGR);
-    namedWindow("Sobel");
-    imshow("Sobel",cdst);
-    /// Détection de lignes
-
-  vector<Vec2f> lines;
-  HoughLines(grad, lines, 1, CV_PI/180, 100, 0, 0 );
-  for( size_t i = 0; i < lines.size(); i++ )
-  {
-     float rho = lines[i][0], theta = lines[i][1];
-     Point pt1, pt2;
-     double a = cos(theta), b = sin(theta);
-     double x0 = a*rho, y0 = b*rho;
-     pt1.x = cvRound(x0 + 1000*(-b));
-     pt1.y = cvRound(y0 + 1000*(a));
-     pt2.x = cvRound(x0 - 1000*(-b));
-     pt2.y = cvRound(y0 - 1000*(a));
-     line( cdst, pt1, pt2, Scalar(0,0,255), 3, CV_AA);
-  }
-
-  vector<Vec4i> lines;
-  HoughLinesP(grad, lines, 1, CV_PI/180, 50, 450, 10 );
-  cout << CV_PI << endl;
-  for( size_t i = 0; i < lines.size(); i++ )
-  {
-    Vec4i l = lines[i];
-    line( cdst, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
-  }
-*/
-
- Mat dst, cdst;
+ Mat cdst;
  Canny(img, dst, 50, 200, 3);
  cvtColor(dst, cdst, CV_GRAY2BGR);
 
- #if 0
-  vector<Vec2f> lines;
-  HoughLines(dst, lines, 1, CV_PI/180, 100, 0, 0 );
 
-  for( size_t i = 0; i < lines.size(); i++ )
-  {
-     float rho = lines[i][0], theta = lines[i][1];
-     Point pt1, pt2;
-     double a = cos(theta), b = sin(theta);
-     double x0 = a*rho, y0 = b*rho;
-     pt1.x = cvRound(x0 + 1000*(-b));
-     pt1.y = cvRound(y0 + 1000*(a));
-     pt2.x = cvRound(x0 - 1000*(-b));
-     pt2.y = cvRound(y0 - 1000*(a));
-     line( cdst, pt1, pt2, Scalar(0,0,255), 3, CV_AA);
-  }
- #else
     vector<Vec4i> lines;
     HoughLinesP(dst, lines, 1, CV_PI/180, 50, 150, 30 );
     cout << lines.size() << endl;
+
+    Vec4i leftSide,rightSide;
     if (!lines.empty()) {
-        Vec4i leftSide=lines[0];
-        Vec4i rightSide=leftSide;
+        leftSide=lines[0];
+        rightSide=leftSide;
         for( size_t i = 0; i < lines.size(); i++ )
         {
             Vec4i l = lines[i];
@@ -131,7 +104,17 @@ int main(int argc, char *argv[])
         line( cdst, Point(rightSide[0], rightSide[1]), Point(rightSide[2], rightSide[3]), Scalar(0,255,0), 3, CV_AA);
     }
 
- #endif
+    int dist = rightSide[0]-leftSide[0];
+    int _hauteur = max(rightSide[3]-rightSide[1],leftSide[3]-leftSide[1]);
+    int _marge_basse = _hauteur/4;
+    Point h_g(leftSide[0],max(leftSide[1]-dist,0));
+    Point b_d(rightSide[0],rightSide[1]+_marge_basse);
+
+    Mat matrice_Reduite(dst,Rect(h_g,b_d));
+
+    RotatedRect mon_ellipse = fitEllipse(matrice_Reduite);
+
+    ellipse( img,mon_ellipse, Scalar(0,255,0), 3, CV_AA );
 
     //namedWindow("Detected lines",CV_WINDOW_AUTOSIZE);
     //imshow("Detected lines",cdst);
@@ -139,7 +122,27 @@ int main(int argc, char *argv[])
     imshow("source", img);
     imshow("detected lines", cdst);
 
-    waitKey(0);
+
+
+
+
+  /// Load source image and convert it to gray
+  src = imread("images/cans/sevenup.jpg", 1 );
+
+  /// Convert image to gray and blur it
+  cvtColor( src, src_gray, CV_BGR2GRAY );
+  blur( src_gray, src_gray, Size(3,3) );
+
+  /// Create Window
+  char* source_window = "Source";
+  namedWindow( source_window, CV_WINDOW_AUTOSIZE );
+  imshow( source_window, src );
+
+  createTrackbar( " Threshold:", "Source", &thresh, max_thresh, thresh_callback);
+  thresh_callback( 0, 0);
+
+  waitKey(0);
+
     return 0;
 }
 
