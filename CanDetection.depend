@@ -1,0 +1,14 @@
+# depslib dependency file v1.0
+1431280671 source:/home/benjamin/TraitImg/CanDetection/main.cpp
+	<stdio.h>
+	<iostream>
+	"opencv2/core/core.hpp"
+	"opencv2/features2d/features2d.hpp"
+	"opencv2/highgui/highgui.hpp"
+	"opencv2/nonfree/features2d.hpp"
+	<opencv2/core/core.hpp>
+	<opencv2/imgproc/imgproc.hpp>
+	<opencv2/highgui/highgui.hpp>
+	<iostream>
+	<cmath>
+

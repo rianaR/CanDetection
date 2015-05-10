@@ -1,19 +1,186 @@
+/**
+ * @file SURF_FlannMatcher
+ * @brief SURF detector + descriptor + FLANN Matcher
+ * @author A. Huaman
+ */
+
+#include <stdio.h>
+#include <iostream>
+#include "opencv2/core/core.hpp"
+#include "opencv2/features2d/features2d.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/nonfree/features2d.hpp"
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <iostream>
 #include <cmath>
+
 using namespace cv;
 using namespace std;
 
 
 Mat src; Mat src_gray;
 int thresh = 100;
+int threshCorner = 170;
 int max_thresh = 255;
+
+
 RNG rng(12345);
 Point h_g,b_d;
 Mat dst;
 double INFINI=1000.0;
+
+//nom source image
+char* source_window = "Source image";
+// nom fenetre corners
+char* corners_window = "Corners detected";
+
+
+void readme();
+
+
+int points_comparer_main();
+
+int points_comparer_main(Mat im1,Mat im2)
+{
+    Mat img_1 = im1;
+    Mat img_2 = im2;
+  //Mat img_1 = imread( "images/cans/sevenup.jpg", CV_LOAD_IMAGE_GRAYSCALE );
+  //Mat img_2 = imread( "images/cans/sevenup.jpg", CV_LOAD_IMAGE_GRAYSCALE );
+
+  if( !img_1.data || !img_2.data )
+  { std::cout<< " --(!) Error reading images " << std::endl; return -1; }
+
+  //-- Step 1: Detect the keypoints using SURF Detector
+  int minHessian = 400;
+
+  SurfFeatureDetector detector( minHessian );
+
+  std::vector<KeyPoint> keypoints_1, keypoints_2;
+
+  detector.detect( img_1, keypoints_1 );
+  detector.detect( img_2, keypoints_2 );
+
+  //-- Step 2: Calculate descriptors (feature vectors)
+  SurfDescriptorExtractor extractor;
+
+  Mat descriptors_1, descriptors_2;
+
+  extractor.compute( img_1, keypoints_1, descriptors_1 );
+  extractor.compute( img_2, keypoints_2, descriptors_2 );
+
+  //-- Step 3: Matching descriptor vectors using FLANN matcher
+  FlannBasedMatcher matcher;
+  std::vector< DMatch > matches;
+  matcher.match( descriptors_1, descriptors_2, matches );
+
+  double max_dist = 0; double min_dist = 100;
+
+  //-- Quick calculation of max and min distances between keypoints
+  for( int i = 0; i < descriptors_1.rows; i++ )
+  { double dist = matches[i].distance;
+    if( dist < min_dist ) min_dist = dist;
+    if( dist > max_dist ) max_dist = dist;
+  }
+
+  printf("-- Max dist : %f \n", max_dist );
+  printf("-- Min dist : %f \n", min_dist );
+
+  //-- Draw only "good" matches (i.e. whose distance is less than 2*min_dist,
+  //-- or a small arbitary value ( 0.02 ) in the event that min_dist is very
+  //-- small)
+  //-- PS.- radiusMatch can also be used here.
+  std::vector< DMatch > good_matches;
+
+  for( int i = 0; i < descriptors_1.rows; i++ )
+  { if( matches[i].distance <= max(2*min_dist, 0.02) )
+    { good_matches.push_back( matches[i]); }
+  }
+
+  //-- Draw only "good" matches
+  Mat img_matches;
+  drawMatches( img_1, keypoints_1, img_2, keypoints_2,
+               good_matches, img_matches, Scalar::all(-1), Scalar::all(-1),
+               vector<char>(), DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS );
+
+  //-- Show detected matches
+  imshow( "Good Matches", img_matches );
+
+  for( int i = 0; i < (int)good_matches.size(); i++ )
+  { printf( "-- Good Match [%d] Keypoint 1: %d  -- Keypoint 2: %d  \n", i, good_matches[i].queryIdx, good_matches[i].trainIdx ); }
+
+  waitKey(0);
+
+  return 0;
+}
+
+/**
+ * @function readme
+ */
+void readme()
+{ std::cout << " Usage: ./SURF_FlannMatcher <img1> <img2>" << std::endl; }
+
+
+
+// methode de dectection de corners
+Mat cornerHarris_demo( int, void*,int,Mat,Mat );
+
+// methode de detection de conters
+Mat cornerHarris_demo( int, void*, int threshC, Mat my_src )
+{
+    cout << "corner harris demo"<< endl;
+    Mat my_src_grey;
+    cvtColor( my_src, my_src_grey, CV_BGR2GRAY );
+
+  Mat dst, dst_norm, dst_norm_scaled;
+  dst = Mat::zeros( src.size(), CV_32FC1 );
+
+  /// Detector parameters
+  int blockSize = 2;
+  int apertureSize = 3;
+  double k = 0.04;
+
+  /// Detecting corners
+  cornerHarris( my_src_grey, dst, blockSize, apertureSize, k, BORDER_DEFAULT );
+
+  /// Normalizing
+  normalize( dst, dst_norm, 0, 255, NORM_MINMAX, CV_32FC1, Mat() );
+  convertScaleAbs( dst_norm, dst_norm_scaled );
+
+  /// Drawing a circle around corners
+  for( int j = 0; j < dst_norm.rows ; j++ )
+     { for( int i = 0; i < dst_norm.cols; i++ )
+          {
+            if( (int) dst_norm.at<float>(j,i) > threshC )
+              {
+               circle( dst_norm_scaled, Point( i, j ), 5,  Scalar(0), 2, 8, 0 );
+              }
+          }
+     }
+
+  return dst_norm_scaled;
+}
+
+Mat getCornerMatrice(int threshC,Mat my_src){
+    return cornerHarris_demo(0,0,threshC,my_src);
+}
+
+Mat getCornerMatrice(int threshC,string link){
+    Mat img = imread(link, CV_LOAD_IMAGE_COLOR);
+    return cornerHarris_demo(0,0,threshC,img);
+}
+
+
+void displayCornerWindow(Mat dst_norm_scaled){
+
+  /// Showing the result
+  namedWindow( corners_window, CV_WINDOW_AUTOSIZE );
+  imshow( corners_window, dst_norm_scaled );
+
+
+}
+
 
 // Image
 void thresh_callback(int, void*);
@@ -167,14 +334,34 @@ vector<Point2i> topEllipseOfCan(vector<Point2i> &shape, int resolution) {
 //        }
 //    }
 
+
+
+
 int main(int argc, char *argv[])
 {
+
     cout.precision(4);
 
     Mat img = imread("images/cans/sevenup.jpg", CV_LOAD_IMAGE_COLOR);
 
     if(img.empty())
        return -1;
+
+
+  /// Load source image and convert it to gray
+  src = imread( "images/cans/sevenup.jpg", 1 );
+
+
+  /// Create a window and a trackbar
+  //namedWindow( source_window, CV_WINDOW_AUTOSIZE );
+//  createTrackbar( "Threshold: ", source_window, &threshCorner, max_thresh, cornerHarris_demo );
+
+  //imshow( source_window, src );
+
+  Mat corner = cornerHarris_demo( 0, 0,threshCorner,src );
+cout << "test" <<endl;
+
+
 
     /// Image couleur pour pouvoir tracer des formes en couleur
     /// sur l'image des contours qui est en noir et blanc
@@ -285,7 +472,9 @@ int main(int argc, char *argv[])
       /// Display
       namedWindow("calcHist Demo", CV_WINDOW_AUTOSIZE );
       //imshow("calcHist Demo", histImage );
-
+   // Mat cornerComp = cornerHarris_demo( 0, 0,threshCorner,src );
+        Mat corner2 = getCornerMatrice(threshCorner,"images/cans/7up.jpg");
+        points_comparer_main(corner,corner2);
     waitKey(0);
 
     return 0;
