@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 {
     cout.precision(4);
 
-    Mat img = imread("images/cans/fanta.jpg", CV_LOAD_IMAGE_COLOR);
+    Mat img = imread("images/cans/sevenup.jpg", CV_LOAD_IMAGE_COLOR);
 
     if(img.empty())
        return -1;
@@ -181,14 +181,10 @@ int main(int argc, char *argv[])
     Mat cdst;
     /// Tracé des contours
     Canny(img, dst, 50, 200, 3);
-    namedWindow("canBefore",CV_WINDOW_AUTOSIZE);
-    imshow("canBefore", dst);
     /// Floutage, utilisé pour rendre les bords plus continus
     GaussianBlur(dst,dst,Size(3,3),0);
 
     threshold( dst, dst, thresh, 255, THRESH_BINARY );
-    namedWindow("canAfter",CV_WINDOW_AUTOSIZE);
-    imshow("canAfter", dst);
     cvtColor(dst, cdst, CV_GRAY2BGR);
 
     /// On trace le rectangle qui contient la canette
@@ -214,114 +210,31 @@ int main(int argc, char *argv[])
     int topLeft = topLeftOfCan(shape, resolution);
     cout << topLeft << endl;
     circle(colorCan,Point(shape[topLeft].x,shape[topLeft].y), 5, Scalar(200,100,50));
-    imshow("Top Left",colorCan);
 
     /// On récupère la demi-ellipse du haut
     vector<Point2i> halfEllipse = topEllipseOfCan(shape, resolution);
-    for (int i=0;i<halfEllipse.size()-1;i++) {
-        line(colorCan,halfEllipse[i],halfEllipse[i+1],Scalar(150,30,59), 3, CV_AA);
+
+    vector<Point2i> topEllipse = halfEllipse;
+    int centerY = halfEllipse[halfEllipse.size()-1].y;
+    for (int sizeHalf = halfEllipse.size(), i=sizeHalf-1 ; i>=0; i--) {
+        int dist = centerY-halfEllipse[i].y;
+        topEllipse.push_back(Point2i(halfEllipse[i].x, centerY+dist));
     }
-    imshow("halfEllipse",colorCan);
-
-    /// Méthode utilisant la transformée de Hough
-    /// Pas très efficace pour trouver les lignes verticales des bords
-//    vector<Vec4i> lines;
-//    HoughLinesP(dst, lines, 1, CV_PI/180, 30, img.rows/3, 20 );
-//    cout << "Nombre de lignes détectées : " << lines.size() << endl;
-//
-//    Vec4i leftSide,rightSide;
-//    if (!lines.empty()) {
-//        leftSide=lines[0];
-//        rightSide=leftSide;
-//        for( size_t i = 0; i < lines.size(); i++ )
-//        {
-//            Vec4i l = lines[i];
-//            /// On vérifie que la ligne est bien verticale
-//            if (abs(l[0] - l[2]) < 10) {
-//                /// La limite gauche ou droite est celle qui est la plus à gauche (droite)
-//                /// ET la plus grande possible
-//                if ((l[0]<=leftSide[0]) && (l[2]<=leftSide[2])) {
-//                    /// Pour "orienter" la ligne de haut en bas
-//                    if (l[1]<l[3]) {
-//                        leftSide=l;
-//                    }
-//                    else {
-//                        leftSide[0]=l[2];
-//                        leftSide[1]=l[3];
-//                        leftSide[2]=l[0];
-//                        leftSide[3]=l[1];
-//                    }
-//                }
-//                if ((l[0]>=rightSide[0]) && (l[2]>=rightSide[2])) {
-//                    /// Pour "orienter" la ligne de haut en bas
-//                    if (l[1]<l[3]) {
-//                        rightSide=l;
-//                    }
-//                    else {
-//                        rightSide[0]=l[2];
-//                        rightSide[1]=l[3];
-//                        rightSide[2]=l[0];
-//                        rightSide[3]=l[1];
-//                    }
-//                }
-//                /// Toutes les lignes sont dessinées en rouge
-//                line( cdst, Point(l[0], l[1]), Point(l[2], l[3]), Scalar(0,0,255), 3, CV_AA);
-//            }
-//        }
-//        /// Les deux lignes sélectionnées sont dessinées en vert
-//        line( cdst, Point(leftSide[0], leftSide[1]), Point(leftSide[2], leftSide[3]), Scalar(0,255,0), 3, CV_AA);
-//        line( cdst, Point(rightSide[0], rightSide[1]), Point(rightSide[2], rightSide[3]), Scalar(0,255,0), 3, CV_AA);
-//
-//
-//
-//
-//        int dist = abs(rightSide[0]-leftSide[0]);
-//        int _hauteur = max(rightSide[3]-rightSide[1],leftSide[3]-leftSide[1]);
-//        int _marge_basse = _hauteur/5;
-//        Point h_g(leftSide[0],max(leftSide[1]-dist,0));
-//        Point b_d(max(rightSide[0],rightSide[2]),min(rightSide[1]+_marge_basse,img.rows/3));
-//        cout << h_g << endl;
-//        cout << b_d << endl;
-        Mat threshold_output;
-        vector<vector<Point> > contours;
-        vector<Vec4i> hierarchy;
-
-        /// Avec image des contours Canny
-
-        /// Detect edges using Threshold
-        threshold( dst, threshold_output, thresh, 255, THRESH_BINARY );
-        /// Find contours
-        Rect searchEllipseArea(limitsRect.x,limitsRect.y,limitsRect.width,limitsRect.height/6);
-        Mat area(img, searchEllipseArea);
-
-        findContours( Mat(threshold_output, searchEllipseArea), contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0) );
-        Mat drawing = Mat::zeros( dst.size(), CV_8UC3 );
-        for( int i = 0; i< contours.size(); i++ )
-        {
-            Scalar color = Scalar( rng.uniform(0, 255), rng.uniform(0,255), rng.uniform(0,255) );
-            drawContours( drawing, contours, i, color, 1, 8, hierarchy, 0, Point() );
-        }
-        namedWindow( "Contours", CV_WINDOW_AUTOSIZE );
-        imshow( "Contours", drawing );
-        /// Find the ellipses for each contour
-        //vector<RotatedRect> minEllipse( contours.size() );
-        RotatedRect minEllipse;
-        for (int i=0; i<contours.size() ;i++) {
-            if (contours[i].size() > 250) {
-                cout << "coucou" << endl;
-                minEllipse = fitEllipse(Mat(contours[i]));
-                ellipse( area,minEllipse, Scalar(0,255,0), 3, CV_AA );
-            }
-        }
-
-        //ellipse( area,minEllipse, Scalar(0,255,0), 3, CV_AA );
-        rectangle(img,Rect(h_g,b_d),Scalar(255,100,0),3,CV_AA);
+    for (int i=0;i<topEllipse.size()-1;i++) {
+        line(colorCan,topEllipse[i],topEllipse[i+1],Scalar(150,30,59), 3, CV_AA);
+    }
 
 
-    namedWindow("Detected rectangle",CV_WINDOW_AUTOSIZE);
-    imshow("Detected rectangle",cdst);
+    RotatedRect fittedEllipse = fitEllipse(topEllipse);
+    Rect boundingRect = fittedEllipse.boundingRect();
 
-    imshow("source", img);
+    rectangle(img,
+                Rect(
+                    Point(boundingRect.x+limitsRect.x,boundingRect.y+limitsRect.y),
+                    Point(boundingRect.x+boundingRect.width+limitsRect.x,boundingRect.y+boundingRect.height+limitsRect.y)),
+                Scalar(0,255,200));
+    namedWindow("topEllipse",CV_WINDOW_AUTOSIZE);
+    imshow("topEllipse",img);
 
     ///Calcul d'histogramme
     /// Separate the image in 3 places ( B, G and R )
